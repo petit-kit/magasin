@@ -1,5 +1,4 @@
 import { forEach } from "@petit-kit/utils";
-import localStoragePlugin from "./plugins/local-storage";
 
 class Magasin {
   private _store: Record<string, any> = {};
@@ -7,7 +6,7 @@ class Magasin {
   private _defaults: Record<string, any> = {};
   private _getters: Record<string, (...args: any[]) => any> = {};
   private _relations: Record<string, any> = {};
-  private plugins: any[] = [];
+  plugins: Record<string, any> = {};
 
   constructor(args: { id?: any; plugins?: any[] } = {}) {
     this.plugins = (args.plugins || [])?.reduce(
@@ -70,10 +69,39 @@ class Magasin {
       this.subscribe(key, callback, broadcast),
   });
 
+  trigger(key: string) {
+    this.set(key, this._getters[key](this._store));
+    return this;
+  }
+
   subscribe(key: string, callback: (value: any) => void, broadcast = true) {
     (this._subscribers[key] ??= []).push(callback);
     if (this._store[key] !== undefined && broadcast) callback(this._store[key]);
     return () => this.unsubscribe(key, callback);
+  }
+
+  subscribes(
+    keys: string[],
+    callback: (values: Record<string, any>) => void,
+    broadcast = true
+  ) {
+    const values: Record<string, any> = {};
+    const unsubscribers: (() => void)[] = [];
+
+    keys.forEach((key) => {
+      unsubscribers.push(
+        this.subscribe(
+          key,
+          (value) => {
+            values[key] = value;
+            callback(values);
+          },
+          broadcast
+        )
+      );
+    });
+
+    return () => unsubscribers.forEach((unsub) => unsub());
   }
 
   unsubscribe(key: string, callback: (value: any) => void) {
@@ -114,4 +142,4 @@ class Magasin {
 const magasin = new Magasin();
 
 export default magasin;
-export { Magasin, localStoragePlugin as localStorage };
+export { Magasin };
